@@ -52,6 +52,6 @@ describe("registerCloudflareMemoryCli", () => {
 
 		const root = roots[0];
 		expect(root?.name).toBe("cf-memory");
-		expect(root?.children.map((child) => child.name)).toEqual(["doctor", "search", "upsert", "delete", "migrate"]);
+		expect(root?.children.map((child) => child.name)).toEqual(["doctor", "init", "test", "search", "upsert", "delete", "migrate"]);
 	});
 });

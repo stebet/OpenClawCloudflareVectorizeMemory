@@ -37,10 +37,7 @@ describe("doctor", () => {
 					JSON.stringify({
 						success: true,
 						result: {
-							config: {
-								dimensions: 3,
-								metric: "cosine",
-							},
+							data: [{ index: 0, embedding: [1, 2, 3] }],
 						},
 					}),
 			})
@@ -50,7 +47,10 @@ describe("doctor", () => {
 					JSON.stringify({
 						success: true,
 						result: {
-							data: [{ index: 0, embedding: [1, 2, 3] }],
+							config: {
+								dimensions: 3,
+								metric: "cosine",
+							},
 						},
 					}),
 			});
@@ -61,5 +61,41 @@ describe("doctor", () => {
 
 		expect(report.ok).toBe(true);
 		expect(report.checks.find((check) => check.name === "metadata-filters")?.status).toBe("warn");
+	});
+
+	it("returns a structured failure when the index is missing", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce({
+				ok: true,
+				text: async () =>
+					JSON.stringify({
+						success: true,
+						result: {
+							data: [{ index: 0, embedding: [1, 2, 3] }],
+						},
+					}),
+			})
+			.mockResolvedValueOnce({
+				ok: false,
+				status: 404,
+				text: async () =>
+					JSON.stringify({
+						success: false,
+						errors: [{ message: 'vectorize.index.not_found - Index name "memory"' }],
+					}),
+			});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const service = new CloudflareMemoryService(baseConfig, {} as never);
+		const report = await service.doctor({ createIndexIfMissing: false });
+
+		expect(report.ok).toBe(false);
+		expect(report.checks.find((check) => check.name === "vectorize-index")).toMatchObject({
+			status: "fail",
+		});
+		expect(report.checks.find((check) => check.name === "dimension-match")).toMatchObject({
+			status: "warn",
+		});
 	});
 });

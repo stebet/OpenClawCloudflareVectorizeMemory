@@ -93,4 +93,26 @@ describe("VectorizeClient", () => {
 			}),
 		);
 	});
+
+	it("deletes an index with the index endpoint", async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			text: async () =>
+				JSON.stringify({
+					success: true,
+					result: {},
+				}),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const client = new VectorizeClient(baseConfig);
+		await client.deleteIndex();
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://api.cloudflare.com/client/v4/accounts/account/vectorize/v2/indexes/memory",
+			expect.objectContaining({
+				method: "DELETE",
+			}),
+		);
+	});
 });

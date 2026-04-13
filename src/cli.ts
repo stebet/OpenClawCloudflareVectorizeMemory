@@ -1,8 +1,7 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
-import type { MigrationDuplicateStrategy } from "./types.js";
+import type { DoctorReport, IndexInitializationReport, MetadataFilter, MigrationDuplicateStrategy, SmokeTestReport } from "./types.js";
 import { formatMigrationSummary, runCloudflareMemoryMigration } from "./migration.js";
 import { createCloudflareMemoryService } from "./service-factory.js";
-import type { MetadataFilter } from "./types.js";
 
 type CliCommand = {
 	command: (name: string) => CliCommand;
@@ -15,6 +14,12 @@ type CliCommand = {
 
 function printJson(value: unknown): void {
 	console.log(JSON.stringify(value, null, 2));
+}
+
+function printCheckReport(report: DoctorReport | IndexInitializationReport | SmokeTestReport): void {
+	for (const check of report.checks) {
+		console.log(`[${check.status}] ${check.name}: ${check.message}`);
+	}
 }
 
 function parseMetadataFlag(value: string | undefined): Record<string, string | number | boolean> | undefined {
@@ -102,9 +107,53 @@ export function registerCloudflareMemoryCli(
 			if (options.json) {
 				printJson(report);
 			} else {
-				for (const check of report.checks) {
-					console.log(`[${check.status}] ${check.name}: ${check.message}`);
-				}
+				printCheckReport(report);
+			}
+			if (!report.ok) {
+				process.exitCode = 1;
+			}
+		});
+
+	root
+		.command("init")
+		.description("Initialize the Cloudflare Vectorize index for the configured embedding model.")
+		.option("--json", "Print structured JSON output.")
+		.action(async (...args) => {
+			const options = resolveOptions(args);
+			const service = await createCloudflareMemoryService({
+				pluginConfig: params.pluginConfig,
+				openClawConfig: params.openClawConfig,
+				env: process.env,
+				resolvePath: params.resolvePath,
+			});
+			const report = await service.initializeIndex();
+			if (options.json) {
+				printJson(report);
+			} else {
+				printCheckReport(report);
+			}
+			if (!report.ok) {
+				process.exitCode = 1;
+			}
+		});
+
+	root
+		.command("test")
+		.description("Run an end-to-end embedding and semantic-search smoke test.")
+		.option("--json", "Print structured JSON output.")
+		.action(async (...args) => {
+			const options = resolveOptions(args);
+			const service = await createCloudflareMemoryService({
+				pluginConfig: params.pluginConfig,
+				openClawConfig: params.openClawConfig,
+				env: process.env,
+				resolvePath: params.resolvePath,
+			});
+			const report = await service.runSmokeTest();
+			if (options.json) {
+				printJson(report);
+			} else {
+				printCheckReport(report);
 			}
 			if (!report.ok) {
 				process.exitCode = 1;

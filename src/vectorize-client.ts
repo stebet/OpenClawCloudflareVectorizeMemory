@@ -36,6 +36,14 @@ export class VectorizeClient {
 		});
 	}
 
+	async deleteIndex(): Promise<void> {
+		await requestCloudflare<unknown>({
+			url: this.config.vectorizeBaseUrl,
+			apiToken: this.config.apiToken,
+			method: "DELETE",
+		});
+	}
+
 	async upsert(vectors: VectorizeVector[]): Promise<string | undefined> {
 		const body = vectors.map((vector) => JSON.stringify(vector)).join("\n");
 		const result = await requestCloudflare<MutationResponse>({

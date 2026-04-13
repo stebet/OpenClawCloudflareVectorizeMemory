@@ -148,6 +148,29 @@ export type DoctorReport = {
 	checks: DoctorCheck[];
 };
 
+export type EmbeddingDimensionsInspection = {
+	embeddingDimensions: number;
+	configuredDimensions?: number;
+	configuredDimensionsMatchModel: boolean;
+	targetDimensions: number;
+};
+
+export type IndexInitializationReport = {
+	ok: boolean;
+	checks: DoctorCheck[];
+	created: boolean;
+	recreated: boolean;
+	embeddingDimensions: number;
+	indexDimensions?: number;
+};
+
+export type SmokeTestReport = {
+	ok: boolean;
+	checks: DoctorCheck[];
+	namespace: string;
+	logicalId: string;
+};
+
 export type MigrationSourceMode = "paths" | "default-provider";
 export type MigrationDuplicateStrategy = "overwrite" | "skip" | "fail";
 export type MigrationNamespaceStrategy = "single-target" | "path";

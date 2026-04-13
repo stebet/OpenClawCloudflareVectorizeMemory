@@ -124,13 +124,27 @@ You can also store `cloudflare.apiToken` as an OpenClaw secret ref instead of pl
 Run:
 
 ```bash
+openclaw cf-memory init
+```
+
+to create or repair the configured Vectorize index so it matches the active embedding model dimensions.
+
+Validate configuration without changing infrastructure:
+
+```bash
 openclaw cf-memory doctor
 ```
 
-To validate config and create the Vectorize index when missing:
+Validate configuration and create the Vectorize index when missing:
 
 ```bash
 openclaw cf-memory doctor --create-index
+```
+
+Run an end-to-end smoke test that verifies embedding, write, search, and cleanup:
+
+```bash
+openclaw cf-memory test
 ```
 
 The doctor flow checks:
@@ -142,6 +156,18 @@ The doctor flow checks:
 - metadata-index guidance for filter-heavy queries
 
 ## CLI usage
+
+Initialize or repair the Vectorize index:
+
+```bash
+openclaw cf-memory init
+```
+
+Run a smoke test:
+
+```bash
+openclaw cf-memory test
+```
 
 Migrate the default OpenClaw markdown memory corpus from the current workspace:
 
