@@ -69,7 +69,7 @@ export class CloudflareMemoryService {
 
 		const hydrated = await Promise.all(
 			matches.map(async (match) => {
-				const base = hydrateInlineRecord(match);
+				const base = hydrateInlineRecord(match, { defaultNamespace: namespace });
 				const text = base.text ?? (await this.companionStore.get(base.namespace, base.logicalId))?.text ?? "";
 				return {
 					...base,
@@ -89,7 +89,7 @@ export class CloudflareMemoryService {
 		if (!match) {
 			return null;
 		}
-		const base = hydrateInlineRecord(match);
+		const base = hydrateInlineRecord(match, { defaultNamespace: namespace });
 		const companion = await this.companionStore.get(base.namespace, base.logicalId);
 		return {
 			...base,
@@ -358,6 +358,22 @@ export class CloudflareMemoryService {
 				message: `Inserted smoke-test record ${logicalId} in namespace ${namespace}.`,
 			});
 
+			const fetched = await this.waitForGetHit({
+				namespace,
+				logicalId,
+				timeoutMs: options?.timeoutMs ?? SMOKE_TEST_TIMEOUT_MS,
+				pollIntervalMs: options?.pollIntervalMs ?? SMOKE_TEST_POLL_INTERVAL_MS,
+			});
+			checks.push({
+				name: "probe-get",
+				status: fetched?.namespace === namespace ? "pass" : "fail",
+				message: !fetched
+					? `Get-by-id did not return the smoke-test record within ${(options?.timeoutMs ?? SMOKE_TEST_TIMEOUT_MS) / 1000} seconds.`
+					: fetched.namespace === namespace
+						? "Get-by-id returned the smoke-test record in the expected namespace."
+						: `Get-by-id returned namespace ${fetched.namespace}, expected ${namespace}.`,
+			});
+
 			const found = await this.waitForSearchHit({
 				query: probeText,
 				namespace,
@@ -367,10 +383,12 @@ export class CloudflareMemoryService {
 			});
 			checks.push({
 				name: "probe-search",
-				status: found ? "pass" : "fail",
-				message: found
-					? "Semantic search returned the smoke-test record."
-					: `Semantic search did not return the smoke-test record within ${(options?.timeoutMs ?? SMOKE_TEST_TIMEOUT_MS) / 1000} seconds.`,
+				status: found?.namespace === namespace ? "pass" : "fail",
+				message: !found
+					? `Semantic search did not return the smoke-test record within ${(options?.timeoutMs ?? SMOKE_TEST_TIMEOUT_MS) / 1000} seconds.`
+					: found.namespace === namespace
+						? "Semantic search returned the smoke-test record in the expected namespace."
+						: `Semantic search returned namespace ${found.namespace}, expected ${namespace}.`,
 			});
 		} catch (error) {
 			checks.push({
@@ -446,24 +464,61 @@ export class CloudflareMemoryService {
 		};
 	}
 
-	private async waitForSearchHit(params: { query: string; namespace: string; logicalId: string; timeoutMs: number; pollIntervalMs: number }): Promise<boolean> {
+	private async waitForGetHit(params: {
+		namespace: string;
+		logicalId: string;
+		timeoutMs: number;
+		pollIntervalMs: number;
+	}): Promise<HydratedMemoryRecord | null> {
 		const deadline = Date.now() + params.timeoutMs;
 		while (Date.now() <= deadline) {
-			const results = await this.search({
-				query: params.query,
+			const record = await this.get({
+				id: params.logicalId,
 				namespace: params.namespace,
-				maxResults: 5,
-				minScore: 0,
 			});
-			if (results.some((record) => record.logicalId === params.logicalId)) {
-				return true;
+			if (record) {
+				return record;
 			}
 			if (Date.now() + params.pollIntervalMs > deadline) {
 				break;
 			}
 			await this.pause(params.pollIntervalMs);
 		}
-		return false;
+		return null;
+	}
+
+	private async waitForSearchHit(params: {
+		query: string;
+		namespace: string;
+		logicalId: string;
+		timeoutMs: number;
+		pollIntervalMs: number;
+	}): Promise<(HydratedMemoryRecord & { score: number }) | null> {
+		const vector = await this.embeddings.embedQuery(params.query);
+		const deadline = Date.now() + params.timeoutMs;
+		while (Date.now() <= deadline) {
+			const matches = await this.vectorize.query({
+				vector,
+				namespace: params.namespace,
+				topK: 5,
+			});
+			for (const match of matches) {
+				const record = hydrateInlineRecord(match, { defaultNamespace: params.namespace });
+				if (record.logicalId === params.logicalId) {
+					const text = record.text ?? (await this.companionStore.get(record.namespace, record.logicalId))?.text ?? "";
+					return {
+						...record,
+						text,
+						score: match.score ?? 0,
+					};
+				}
+			}
+			if (Date.now() + params.pollIntervalMs > deadline) {
+				break;
+			}
+			await this.pause(params.pollIntervalMs);
+		}
+		return null;
 	}
 
 	private async pause(ms: number): Promise<void> {

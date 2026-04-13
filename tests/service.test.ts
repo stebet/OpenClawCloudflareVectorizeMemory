@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RESERVED_METADATA_KEYS } from "../src/constants.js";
 import { CloudflareApiError } from "../src/errors.js";
+import { buildVectorId } from "../src/record-mapper.js";
 import { CloudflareMemoryService } from "../src/service.js";
 import type { ResolvedPluginConfig } from "../src/types.js";
 
@@ -115,22 +117,37 @@ describe("CloudflareMemoryService", () => {
 				source: input.source,
 			};
 		});
-
+		vi.spyOn(service, "get").mockImplementation(async () => {
+			if (!capturedId || !capturedNamespace) {
+				return null;
+			}
+			return {
+				logicalId: capturedId,
+				vectorId: `${capturedNamespace}::${capturedId}`,
+				namespace: capturedNamespace,
+				text: `OpenClaw Cloudflare memory smoke test ${capturedId}`,
+				metadata: {},
+				path: `${capturedNamespace}/${capturedId}.md`,
+			};
+		});
+		const embedQuery = vi.spyOn(service.embeddings, "embedQuery").mockResolvedValue([1, 2, 3]);
 		let searchCalls = 0;
-		vi.spyOn(service, "search").mockImplementation(async () => {
+		vi.spyOn(service.vectorize, "query").mockImplementation(async ({ namespace }) => {
 			searchCalls += 1;
+			expect(namespace).toBe(capturedNamespace);
 			if (searchCalls < 2) {
 				return [];
 			}
 			return [
 				{
-					logicalId: capturedId,
-					vectorId: `${capturedNamespace}::${capturedId}`,
+					id: `${capturedNamespace}::${capturedId}`,
 					namespace: capturedNamespace,
-					text: `OpenClaw Cloudflare memory smoke test ${capturedId}`,
-					metadata: {},
-					path: `${capturedNamespace}/${capturedId}.md`,
 					score: 0.99,
+					metadata: {
+						[RESERVED_METADATA_KEYS.logicalId]: capturedId,
+						[RESERVED_METADATA_KEYS.namespace]: capturedNamespace,
+						[RESERVED_METADATA_KEYS.text]: `OpenClaw Cloudflare memory smoke test ${capturedId}`,
+					},
 				},
 			];
 		});
@@ -148,8 +165,11 @@ describe("CloudflareMemoryService", () => {
 			id: capturedId,
 			namespace: capturedNamespace,
 		});
+		expect(report.checks.find((check) => check.name === "probe-get")?.status).toBe("pass");
 		expect(report.checks.find((check) => check.name === "probe-search")?.status).toBe("pass");
 		expect(report.checks.find((check) => check.name === "probe-cleanup")?.status).toBe("pass");
+		expect(embedQuery).toHaveBeenCalledTimes(1);
+		expect(searchCalls).toBe(2);
 	});
 
 	it("falls back to the upsert input when get-by-id omits inline metadata", async () => {
@@ -191,5 +211,92 @@ describe("CloudflareMemoryService", () => {
 			},
 			mutationId: "mutation-1",
 		});
+	});
+
+	it("keeps implicit and explicit namespaces aligned when Vectorize omits match namespaces", async () => {
+		const service = new CloudflareMemoryService(baseConfig, {} as never);
+		const logicalId = "publish-check";
+		const text = "Verify Cloudflare memory publish checks.";
+		const sessionKey = "session-1";
+		let storedVector:
+			| {
+					id: string;
+					namespace?: string;
+					metadata?: Record<string, string | number | boolean>;
+			  }
+			| undefined;
+		const queriedNamespaces: string[] = [];
+		const deletedVectorIds: string[] = [];
+
+		vi.spyOn(service.embeddings, "embedQuery").mockResolvedValue([1, 2, 3]);
+		vi.spyOn(service.vectorize, "upsert").mockImplementation(async ([vector]) => {
+			storedVector = vector;
+			return "mutation-1";
+		});
+		vi.spyOn(service.vectorize, "getByIds").mockImplementation(async (ids) => [
+			{
+				id: ids[0],
+				metadata: storedVector?.metadata,
+			},
+		]);
+		vi.spyOn(service.vectorize, "query").mockImplementation(async ({ namespace }) => {
+			queriedNamespaces.push(namespace ?? "");
+			return storedVector
+				? [
+						{
+							id: storedVector.id,
+							score: 0.99,
+							metadata: storedVector.metadata,
+						},
+					]
+				: [];
+		});
+		vi.spyOn(service.vectorize, "deleteByIds").mockImplementation(async (ids) => {
+			deletedVectorIds.push(...ids);
+			return "mutation-delete";
+		});
+
+		const upserted = await service.upsert({
+			input: {
+				id: logicalId,
+				text,
+			},
+			sessionKey,
+		});
+		const implicitGet = await service.get({
+			id: logicalId,
+			sessionKey,
+		});
+		const explicitGet = await service.get({
+			id: logicalId,
+			namespace: "agent-main",
+			sessionKey,
+		});
+		const implicitSearch = await service.search({
+			query: text,
+			sessionKey,
+		});
+		const explicitSearch = await service.search({
+			query: text,
+			namespace: "agent-main",
+			sessionKey,
+		});
+		await service.delete({
+			id: logicalId,
+			sessionKey,
+		});
+		await service.delete({
+			id: logicalId,
+			namespace: "agent-main",
+			sessionKey,
+		});
+
+		expect(upserted.namespace).toBe("agent-main");
+		expect(implicitGet?.namespace).toBe("agent-main");
+		expect(explicitGet?.namespace).toBe("agent-main");
+		expect(implicitSearch.map((record) => record.namespace)).toEqual(["agent-main"]);
+		expect(explicitSearch.map((record) => record.namespace)).toEqual(["agent-main"]);
+		expect(queriedNamespaces).toEqual(["agent-main", "agent-main"]);
+		expect(deletedVectorIds).toEqual([buildVectorId("agent-main", logicalId), buildVectorId("agent-main", logicalId)]);
 	});
 });

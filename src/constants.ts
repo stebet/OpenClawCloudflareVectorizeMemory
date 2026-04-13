@@ -32,6 +32,7 @@ export const DEFAULT_INDEX_DESCRIPTION = "OpenClaw memory index backed by Cloudf
 export const RESERVED_METADATA_PREFIX = "oc_";
 export const RESERVED_METADATA_KEYS = {
 	logicalId: "oc_record_id",
+	namespace: "oc_namespace",
 	title: "oc_title",
 	text: "oc_text",
 	storageMode: "oc_storage_mode",

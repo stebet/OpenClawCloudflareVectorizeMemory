@@ -103,4 +103,23 @@ describe("WorkersAiEmbeddingsClient", () => {
 			[3, 4],
 		]);
 	});
+
+	it("caches repeated embedQuery calls for the same text", async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			text: async () =>
+				JSON.stringify({
+					data: [{ index: 0, embedding: [1, 2, 3] }],
+				}),
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const client = new WorkersAiEmbeddingsClient(baseConfig);
+		const first = await client.embedQuery("repeat me");
+		first[0] = 99;
+		const second = await client.embedQuery("repeat me");
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(second).toEqual([1, 2, 3]);
+	});
 });

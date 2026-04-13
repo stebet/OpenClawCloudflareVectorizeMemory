@@ -39,6 +39,17 @@ export function buildVectorId(namespace: string, logicalId: string): string {
 	return `cfm_${createHash("sha256").update(rawId).digest("hex").slice(0, 48)}`;
 }
 
+function parseNamespaceFromVectorId(vectorId: string | undefined): string | undefined {
+	if (!vectorId || vectorId.startsWith("cfm_")) {
+		return undefined;
+	}
+	const separatorIndex = vectorId.indexOf("::");
+	if (separatorIndex <= 0) {
+		return undefined;
+	}
+	return vectorId.slice(0, separatorIndex);
+}
+
 export function buildVirtualPath(namespace: string, logicalId: string): string {
 	return `${namespace}/${logicalId}.md`;
 }
@@ -84,6 +95,7 @@ export function mapRecordForUpsert(params: { input: MemoryRecordInput; namespace
 	const metadataBase: Record<string, MetadataValue> = {
 		...userMetadata,
 		[RESERVED_METADATA_KEYS.logicalId]: logicalId,
+		[RESERVED_METADATA_KEYS.namespace]: params.namespace,
 		[RESERVED_METADATA_KEYS.storageMode]: params.config.storageMode,
 		[RESERVED_METADATA_KEYS.createdAt]: now,
 		[RESERVED_METADATA_KEYS.updatedAt]: now,
@@ -134,13 +146,26 @@ export function mapRecordForUpsert(params: { input: MemoryRecordInput; namespace
 	};
 }
 
-export function hydrateInlineRecord(match: VectorizeQueryMatch): Omit<HydratedMemoryRecord, "text" | "path"> & {
+export function hydrateInlineRecord(
+	match: VectorizeQueryMatch,
+	options?: {
+		defaultNamespace?: string;
+	},
+): Omit<HydratedMemoryRecord, "text" | "path"> & {
 	text?: string;
 	path: string;
 } {
 	const metadata = match.metadata ?? {};
+	const pointerPath = typeof metadata[RESERVED_METADATA_KEYS.pointer] === "string" ? parseVirtualPath(String(metadata[RESERVED_METADATA_KEYS.pointer])) : null;
 	const namespace =
-		match.namespace ?? (typeof metadata[RESERVED_METADATA_KEYS.pointer] === "string" ? String(metadata[RESERVED_METADATA_KEYS.pointer]).split("/")[0] : "main");
+		typeof match.namespace === "string"
+			? match.namespace
+			: typeof metadata[RESERVED_METADATA_KEYS.namespace] === "string"
+				? String(metadata[RESERVED_METADATA_KEYS.namespace])
+				: (pointerPath?.namespace ??
+					parseNamespaceFromVectorId(typeof match.id === "string" ? String(match.id) : undefined) ??
+					options?.defaultNamespace ??
+					"main");
 	const logicalId =
 		typeof metadata[RESERVED_METADATA_KEYS.logicalId] === "string" ? String(metadata[RESERVED_METADATA_KEYS.logicalId]) : String(match.id ?? "");
 	const userMetadata = Object.fromEntries(Object.entries(metadata).filter(([key]) => !key.startsWith(RESERVED_METADATA_PREFIX)));

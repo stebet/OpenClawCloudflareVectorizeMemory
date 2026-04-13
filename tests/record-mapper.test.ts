@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVectorId, mapRecordForUpsert } from "../src/record-mapper.js";
+import { buildVectorId, hydrateInlineRecord, mapRecordForUpsert } from "../src/record-mapper.js";
 import type { ResolvedPluginConfig } from "../src/types.js";
 
 const inlineConfig: ResolvedPluginConfig = {
@@ -37,6 +37,7 @@ describe("mapRecordForUpsert", () => {
 		});
 
 		expect(mapped.vector.metadata?.oc_text).toBe("Remember this");
+		expect(mapped.vector.metadata?.oc_namespace).toBe("main");
 		expect(mapped.companionRecord).toBeUndefined();
 	});
 
@@ -55,7 +56,22 @@ describe("mapRecordForUpsert", () => {
 		});
 
 		expect(mapped.vector.metadata?.oc_pointer).toBe("agent-main/record-2.md");
+		expect(mapped.vector.metadata?.oc_namespace).toBe("agent-main");
 		expect(mapped.companionRecord?.text).toBe("Store this externally");
+	});
+
+	it("recovers the namespace from metadata when Vectorize omits it from the match", () => {
+		const record = hydrateInlineRecord({
+			id: "cfm_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbe",
+			metadata: {
+				oc_record_id: "record-3",
+				oc_namespace: "agent-main",
+				oc_text: "Remember this",
+			},
+		});
+
+		expect(record.namespace).toBe("agent-main");
+		expect(record.path).toBe("agent-main/record-3.md");
 	});
 
 	it("hashes long vector ids to stay within Vectorize limits", () => {

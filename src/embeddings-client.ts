@@ -1,6 +1,8 @@
 import { requestCloudflare } from "./cloudflare-api.js";
 import type { ResolvedPluginConfig } from "./types.js";
 
+const QUERY_CACHE_LIMIT = 64;
+
 type OpenAiEmbeddingResponse = {
 	data: Array<{
 		embedding: number[];
@@ -28,11 +30,36 @@ function isOpenAiEmbeddingResponse(response: EmbeddingResponse): response is Ope
 }
 
 export class WorkersAiEmbeddingsClient {
+	private readonly queryCache = new Map<string, Promise<number[]>>();
+
 	constructor(private readonly config: ResolvedPluginConfig) {}
 
 	async embedQuery(text: string): Promise<number[]> {
-		const [embedding] = await this.embedBatch([text]);
-		return embedding;
+		const cached = this.queryCache.get(text);
+		if (cached) {
+			return [...(await cached)];
+		}
+
+		const pending = this.embedBatch([text])
+			.then(([embedding]) => {
+				if (!embedding) {
+					throw new Error("Workers AI did not return an embedding.");
+				}
+				return embedding;
+			})
+			.catch((error) => {
+				this.queryCache.delete(text);
+				throw error;
+			});
+		this.queryCache.set(text, pending);
+		if (this.queryCache.size > QUERY_CACHE_LIMIT) {
+			const oldestKey = this.queryCache.keys().next().value;
+			if (typeof oldestKey === "string") {
+				this.queryCache.delete(oldestKey);
+			}
+		}
+
+		return [...(await pending)];
 	}
 
 	async embedBatch(texts: string[]): Promise<number[][]> {

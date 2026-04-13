@@ -4,7 +4,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { AnyAgentTool, OpenClawPluginToolContext } from "openclaw/plugin-sdk/plugin-entry";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createDeleteTool, createGetTool, createSearchTool, createUpsertTool } from "../src/tools.js";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, "..");
@@ -86,6 +89,24 @@ const shouldRunLiveIntegration =
 	getConfiguredValue("OPENCLAW_CF_MEMORY_RUN_LIVE_INTEGRATION") === "1" && requiredEnvVars.every((name) => Boolean(getConfiguredValue(name)));
 const liveDescribe = shouldRunLiveIntegration ? describe : describe.skip;
 
+function createLiveOpenClawConfig(): OpenClawConfig {
+	return {
+		plugins: {
+			load: {
+				paths: [repoRoot],
+			},
+			slots: {
+				memory: "memory-cloudflare-vectorize",
+			},
+			entries: {
+				"memory-cloudflare-vectorize": {
+					enabled: true,
+				},
+			},
+		},
+	} as unknown as OpenClawConfig;
+}
+
 type DoctorReport = {
 	ok: boolean;
 	checks: Array<{
@@ -108,6 +129,28 @@ type SearchResult = {
 type CliRunResult = {
 	stdout: string;
 	stderr: string;
+};
+
+type ToolGetDetails =
+	| {
+			found: false;
+	  }
+	| {
+			found: true;
+			id: string;
+			namespace: string;
+			metadata: Record<string, string | number | boolean>;
+	  };
+
+type ToolSearchDetails = {
+	count: number;
+	records: Array<{
+		id: string;
+		namespace: string;
+		title?: string;
+		score: number;
+		path: string;
+	}>;
 };
 
 function extractJsonText(output: CliRunResult): string {
@@ -141,6 +184,10 @@ function parseJsonOutput<T>(output: CliRunResult): T {
 	return JSON.parse(extractJsonText(output)) as T;
 }
 
+function getToolDetails<T>(result: Awaited<ReturnType<AnyAgentTool["execute"]>>): T {
+	return result.details as T;
+}
+
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -148,32 +195,25 @@ function delay(ms: number): Promise<void> {
 liveDescribe("cf-memory live integration", () => {
 	let tempDir: string;
 	let configPath: string;
+	let openClawConfig: OpenClawConfig;
 
 	beforeEach(() => {
 		tempDir = mkdtempSync(join(tmpdir(), "cf-memory-live-"));
 		configPath = join(tempDir, "openclaw.json");
+		openClawConfig = createLiveOpenClawConfig();
 
-		writeFileSync(
-			configPath,
-			JSON.stringify({
-				plugins: {
-					load: {
-						paths: [repoRoot],
-					},
-					slots: {
-						memory: "memory-cloudflare-vectorize",
-					},
-					entries: {
-						"memory-cloudflare-vectorize": {
-							enabled: true,
-						},
-					},
-				},
-			}),
-		);
+		writeFileSync(configPath, JSON.stringify(openClawConfig));
+
+		for (const [name, value] of Object.entries(resolvedDotEnvValues)) {
+			vi.stubEnv(name, value);
+		}
+		vi.stubEnv("OPENCLAW_CONFIG_PATH", configPath);
+		vi.stubEnv("OPENCLAW_CF_MEMORY_COMPANION_PATH", join(tempDir, "companion-store.json"));
+		vi.stubEnv("OPENCLAW_DISABLE_PLUGIN_MANIFEST_CACHE", "1");
 	});
 
 	afterEach(() => {
+		vi.unstubAllEnvs();
 		rmSync(tempDir, { recursive: true, force: true });
 	});
 
@@ -230,6 +270,93 @@ liveDescribe("cf-memory live integration", () => {
 		}
 
 		throw new Error(`Timed out waiting for record ${params.logicalId} to ${params.shouldExist ? "appear in" : "disappear from"} search results.`);
+	}
+
+	function createLiveTools(): {
+		upsertTool: AnyAgentTool;
+		getTool: AnyAgentTool;
+		searchTool: AnyAgentTool;
+		deleteTool: AnyAgentTool;
+	} {
+		const registration = {
+			pluginConfig: {},
+			resolvePath: (input: string) => join(repoRoot, input),
+		};
+		const toolContext: OpenClawPluginToolContext = {
+			runtimeConfig: openClawConfig,
+			sessionKey: "session-1",
+			agentId: "agent-1",
+			workspaceDir: tempDir,
+		};
+		return {
+			upsertTool: createUpsertTool(registration, toolContext),
+			getTool: createGetTool(registration, toolContext),
+			searchTool: createSearchTool(registration, toolContext),
+			deleteTool: createDeleteTool(registration, toolContext),
+		};
+	}
+
+	async function waitForToolGetState(params: {
+		tool: AnyAgentTool;
+		id: string;
+		namespace?: string;
+		expectedNamespace: string;
+		timeoutMs?: number;
+		pollIntervalMs?: number;
+	}): Promise<Extract<ToolGetDetails, { found: true }>> {
+		const deadline = Date.now() + (params.timeoutMs ?? 120_000);
+		while (Date.now() <= deadline) {
+			const result = await params.tool.execute(
+				`tool-get-${randomUUID()}`,
+				{
+					id: params.id,
+					...(params.namespace ? { namespace: params.namespace } : {}),
+				},
+				new AbortController().signal,
+				() => {},
+			);
+			const details = getToolDetails<ToolGetDetails>(result);
+			if (details.found && details.id === params.id && details.namespace === params.expectedNamespace) {
+				return details;
+			}
+			await delay(params.pollIntervalMs ?? 2_000);
+		}
+
+		throw new Error(`Timed out waiting for tool get(${params.id}) to resolve in namespace ${params.expectedNamespace}.`);
+	}
+
+	async function waitForToolSearchState(params: {
+		tool: AnyAgentTool;
+		query: string;
+		logicalId: string;
+		namespace?: string;
+		expectedNamespace: string;
+		shouldExist: boolean;
+		timeoutMs?: number;
+		pollIntervalMs?: number;
+	}): Promise<ToolSearchDetails> {
+		const deadline = Date.now() + (params.timeoutMs ?? 120_000);
+		while (Date.now() <= deadline) {
+			const result = await params.tool.execute(
+				`tool-search-${randomUUID()}`,
+				{
+					query: params.query,
+					...(params.namespace ? { namespace: params.namespace } : {}),
+				},
+				new AbortController().signal,
+				() => {},
+			);
+			const details = getToolDetails<ToolSearchDetails>(result);
+			const match = details.records.find((record) => record.id === params.logicalId && record.namespace === params.expectedNamespace);
+			if ((params.shouldExist && Boolean(match)) || (!params.shouldExist && !match)) {
+				return details;
+			}
+			await delay(params.pollIntervalMs ?? 2_000);
+		}
+
+		throw new Error(
+			`Timed out waiting for tool search(${params.query}) to ${params.shouldExist ? "return" : "clear"} ${params.logicalId} in namespace ${params.expectedNamespace}.`,
+		);
 	}
 
 	it("validates the configured Cloudflare backend and creates the index if needed", () => {
@@ -306,6 +433,90 @@ liveDescribe("cf-memory live integration", () => {
 			query: logicalId,
 			namespace,
 			logicalId,
+			shouldExist: false,
+		});
+	}, 180_000);
+
+	it("round-trips implicit and explicit agent-main tool namespaces", async () => {
+		ensureIndexReady();
+
+		const { upsertTool, getTool, searchTool, deleteTool } = createLiveTools();
+		const logicalId = `tool-namespace-${randomUUID()}`;
+		const text = `Verify implicit and explicit namespace round trips for ${logicalId}.`;
+		const signal = new AbortController().signal;
+
+		const upsertResult = await upsertTool.execute(
+			`tool-upsert-${logicalId}`,
+			{
+				id: logicalId,
+				title: "Tool namespace probe",
+				text,
+				source: "integration-test",
+				metadata: {
+					suite: "live-tools",
+					probe: logicalId,
+				},
+			},
+			signal,
+			() => {},
+		);
+		const upsertDetails = getToolDetails<{
+			id: string;
+			namespace: string;
+			path: string;
+			mutationId?: string;
+		}>(upsertResult);
+		expect(upsertDetails.id).toBe(logicalId);
+		expect(upsertDetails.namespace).toBe("agent-main");
+
+		const implicitGet = await waitForToolGetState({
+			tool: getTool,
+			id: logicalId,
+			expectedNamespace: upsertDetails.namespace,
+		});
+		const explicitGet = await waitForToolGetState({
+			tool: getTool,
+			id: logicalId,
+			namespace: upsertDetails.namespace,
+			expectedNamespace: upsertDetails.namespace,
+		});
+		expect(implicitGet.namespace).toBe(upsertDetails.namespace);
+		expect(explicitGet.namespace).toBe(upsertDetails.namespace);
+
+		const implicitSearch = await waitForToolSearchState({
+			tool: searchTool,
+			query: text,
+			logicalId,
+			expectedNamespace: upsertDetails.namespace,
+			shouldExist: true,
+		});
+		const explicitSearch = await waitForToolSearchState({
+			tool: searchTool,
+			query: text,
+			logicalId,
+			namespace: upsertDetails.namespace,
+			expectedNamespace: upsertDetails.namespace,
+			shouldExist: true,
+		});
+		expect(implicitSearch.records.some((record) => record.id === logicalId && record.namespace === upsertDetails.namespace)).toBe(true);
+		expect(explicitSearch.records.some((record) => record.id === logicalId && record.namespace === upsertDetails.namespace)).toBe(true);
+
+		await deleteTool.execute(
+			`tool-delete-${logicalId}`,
+			{
+				id: logicalId,
+				namespace: upsertDetails.namespace,
+			},
+			signal,
+			() => {},
+		);
+
+		await waitForToolSearchState({
+			tool: searchTool,
+			query: text,
+			logicalId,
+			namespace: upsertDetails.namespace,
+			expectedNamespace: upsertDetails.namespace,
 			shouldExist: false,
 		});
 	}, 180_000);
