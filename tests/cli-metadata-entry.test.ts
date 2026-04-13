@@ -35,7 +35,7 @@ class FakeCommand {
 }
 
 describe("cli metadata entry", () => {
-	it("registers the cf-memory descriptor and lazy CLI registrar", async () => {
+	it("registers the cf-memory descriptor and CLI registrar", async () => {
 		const registerCli = vi.fn();
 
 		expect(cliMetadataEntry.id).toBe("memory-cloudflare-vectorize");

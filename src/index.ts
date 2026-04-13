@@ -2,7 +2,7 @@ import type { MemoryEmbeddingProviderAdapter } from "openclaw/plugin-sdk/memory-
 import { definePluginEntry, type OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import { registerCloudflareMemoryCli } from "./cli.js";
 import { getPluginConfigFromOpenClawConfig, pluginConfigSchema, resolvePluginConfig } from "./config.js";
-import { CLI_ROOT_DESCRIPTOR, DEFAULT_EMBEDDING_MODEL, PLUGIN_DESCRIPTION, PLUGIN_ID, PLUGIN_NAME } from "./constants.js";
+import { CLI_ROOT_COMMAND, CLI_ROOT_DESCRIPTOR, DEFAULT_EMBEDDING_MODEL, PLUGIN_DESCRIPTION, PLUGIN_ID, PLUGIN_NAME } from "./constants.js";
 import { buildPromptSection } from "./prompt.js";
 import { createPublicArtifactsProvider } from "./public-artifacts.js";
 import { createMemoryRuntime } from "./runtime.js";
@@ -50,7 +50,7 @@ function createMemoryEmbeddingProviderAdapter(): MemoryEmbeddingProviderAdapter 
 	};
 }
 
-function registerCloudflareMemoryCliEntry(api: Pick<OpenClawPluginApi, "registerCli" | "pluginConfig" | "config" | "resolvePath">): void {
+function registerCloudflareMemoryCliEntry(api: Pick<OpenClawPluginApi, "registerCli" | "pluginConfig" | "config" | "resolvePath" | "registrationMode">): void {
 	api.registerCli(
 		({ program }) => {
 			registerCloudflareMemoryCli(program, {
@@ -59,9 +59,13 @@ function registerCloudflareMemoryCliEntry(api: Pick<OpenClawPluginApi, "register
 				resolvePath: api.resolvePath,
 			});
 		},
-		{
-			descriptors: [CLI_ROOT_DESCRIPTOR],
-		},
+		api.registrationMode === "cli-metadata"
+			? {
+					descriptors: [CLI_ROOT_DESCRIPTOR],
+				}
+			: {
+					commands: [CLI_ROOT_COMMAND],
+				},
 	);
 }
 
