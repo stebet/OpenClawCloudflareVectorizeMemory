@@ -39,6 +39,20 @@ openclaw plugins install openclaw-cloudflare-vectorize-memory
 
 Publish the package with the included `openclaw.plugin.json` manifest and install it through normal ClawHub/OpenClaw plugin flows.
 
+OpenClaw uses the plugin manifest id `memory-cloudflare-vectorize` as the config key, so plugin config stays under `plugins.entries.memory-cloudflare-vectorize`.
+
+## Optional bootstrap hook
+
+This package also ships an optional managed hook named `cloudflare-memory-bootstrap`.
+
+Enable it after installation with:
+
+```bash
+openclaw hooks enable cloudflare-memory-bootstrap
+```
+
+When enabled, the hook injects packaged bootstrap guidance so agents know the Cloudflare memory plugin is installed and can point operators at `openclaw cf-memory doctor`.
+
 ## Publishing to npmjs
 
 After authenticating with npm for the target package owner, publish with:

@@ -10,10 +10,14 @@ export default defineConfig({
 		lib: {
 			entry: "src/index.ts",
 			formats: ["es"],
-			fileName: "index",
 		},
 		rollupOptions: {
 			external,
+			output: {
+				preserveModules: true,
+				preserveModulesRoot: "src",
+				entryFileNames: "[name].js",
+			},
 		},
 	},
 	test: {
