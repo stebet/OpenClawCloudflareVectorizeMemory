@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, "..");
 const openClawBin = join(repoRoot, "node_modules", "openclaw", "openclaw.mjs");
-
 function runOpenClawCli(args: string[]): string {
 	const tempDir = mkdtempSync(join(tmpdir(), "cf-memory-cli-"));
 	const configPath = join(tempDir, "openclaw.json");

@@ -58,6 +58,7 @@ describe("VectorizeClient", () => {
 					filter: { topic: "testing" },
 					namespace: "main",
 					returnValues: false,
+					returnMetadata: "all",
 				}),
 			}),
 		);

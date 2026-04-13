@@ -63,7 +63,17 @@ npm run publish:npmjs
 
 The script runs `check`, `test`, and `build` before calling `npm publish --access public`.
 
+Before publishing, fill in the placeholder values in `.env`, set `OPENCLAW_CF_MEMORY_RUN_LIVE_INTEGRATION=1`, and run:
+
+```bash
+npm run test:integration
+```
+
+The live integration suite rebuilds the package first, resolves Cloudflare settings from `.env`, then fills any untouched placeholder values from `.env.example`, and exercises `doctor --create-index` plus a real `upsert` / `search` / `delete` round-trip against the configured backend. The default `npm test` command keeps running only the fast local test suite.
+
 ## Recommended environment variables
+
+The repository includes `.env` and `.env.example` templates for the live integration tests. Replace the placeholder values in `.env` before enabling the suite.
 
 Cloudflare-standard variables:
 
@@ -86,6 +96,7 @@ Optional:
 set CLOUDFLARE_VECTORIZE_NAMESPACE=my-shared-namespace
 set OPENCLAW_CF_MEMORY_STORAGE_MODE=companion-store
 set OPENCLAW_CF_MEMORY_COMPANION_PATH=C:\path\to\companion-store.json
+set OPENCLAW_CF_MEMORY_TEST_NAMESPACE_PREFIX=cf-memory-live
 ```
 
 If `CLOUDFLARE_VECTORIZE_NAMESPACE` is omitted, the plugin derives namespaces from the active OpenClaw agent/session when possible.

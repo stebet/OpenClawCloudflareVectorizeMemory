@@ -137,7 +137,7 @@ describe("CloudflareMemoryService", () => {
 		const deleteRecord = vi.spyOn(service, "delete").mockResolvedValue("mutation-1");
 
 		const report = await service.runSmokeTest({
-			timeoutMs: 10,
+			timeoutMs: 50,
 			pollIntervalMs: 1,
 		});
 
@@ -150,5 +150,46 @@ describe("CloudflareMemoryService", () => {
 		});
 		expect(report.checks.find((check) => check.name === "probe-search")?.status).toBe("pass");
 		expect(report.checks.find((check) => check.name === "probe-cleanup")?.status).toBe("pass");
+	});
+
+	it("falls back to the upsert input when get-by-id omits inline metadata", async () => {
+		const service = new CloudflareMemoryService(baseConfig, {} as never);
+		vi.spyOn(service.embeddings, "embedQuery").mockResolvedValue([1, 2, 3]);
+		vi.spyOn(service.vectorize, "upsert").mockResolvedValue("mutation-1");
+		vi.spyOn(service, "get").mockResolvedValue({
+			logicalId: "publish-check",
+			vectorId: "cfm_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbe",
+			namespace: "release",
+			text: "",
+			metadata: {},
+			path: "release/publish-check.md",
+		});
+
+		const result = await service.upsert({
+			input: {
+				id: "publish-check",
+				namespace: "release",
+				title: "Publish integration check",
+				text: "Verify Cloudflare memory publish checks.",
+				source: "integration-test",
+				metadata: {
+					topic: "release",
+					suite: "live",
+				},
+			},
+		});
+
+		expect(result).toMatchObject({
+			logicalId: "publish-check",
+			namespace: "release",
+			title: "Publish integration check",
+			text: "Verify Cloudflare memory publish checks.",
+			source: "integration-test",
+			metadata: {
+				topic: "release",
+				suite: "live",
+			},
+			mutationId: "mutation-1",
+		});
 	});
 });

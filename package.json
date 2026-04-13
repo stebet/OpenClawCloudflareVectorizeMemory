@@ -1,6 +1,6 @@
 {
 	"name": "openclaw-cloudflare-vectorize-memory",
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"description": "OpenClaw memory plugin for Cloudflare Vectorize and Workers AI embeddings.",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -40,8 +40,9 @@
 	},
 	"scripts": {
 		"build": "vite build && tsc -p tsconfig.build.json",
-		"test": "vitest run",
-		"test:watch": "vitest",
+		"test": "vitest run --exclude tests/live-integration.test.ts",
+		"test:integration": "npm run build && vitest run tests/live-integration.test.ts",
+		"test:watch": "vitest --exclude tests/live-integration.test.ts",
 		"check": "tsc -p tsconfig.json --noEmit",
 		"publish:npmjs": "npm run check && npm test && npm run build && npm publish --access public"
 	},

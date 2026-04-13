@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapRecordForUpsert } from "../src/record-mapper.js";
+import { buildVectorId, mapRecordForUpsert } from "../src/record-mapper.js";
 import type { ResolvedPluginConfig } from "../src/types.js";
 
 const inlineConfig: ResolvedPluginConfig = {
@@ -56,5 +56,12 @@ describe("mapRecordForUpsert", () => {
 
 		expect(mapped.vector.metadata?.oc_pointer).toBe("agent-main/record-2.md");
 		expect(mapped.companionRecord?.text).toBe("Store this externally");
+	});
+
+	it("hashes long vector ids to stay within Vectorize limits", () => {
+		const vectorId = buildVectorId("cf-memory-test-50926990-8d16-4b7a-acf1-53ea774d7141", "cf-memory-test-cf5e9ef0-d450-40c9-8f24-c859d1624a13");
+
+		expect(Buffer.byteLength(vectorId, "utf8")).toBeLessThanOrEqual(64);
+		expect(vectorId).toMatch(/^cfm_[0-9a-f]{48}$/);
 	});
 });

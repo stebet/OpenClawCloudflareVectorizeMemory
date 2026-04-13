@@ -5,7 +5,7 @@ import { CompanionStore } from "./companion-store.js";
 import { runDoctor } from "./doctor.js";
 import { WorkersAiEmbeddingsClient } from "./embeddings-client.js";
 import { sanitizeNamespace, resolveDefaultNamespace } from "./namespace.js";
-import { hydrateInlineRecord, mapRecordForUpsert } from "./record-mapper.js";
+import { buildVectorId, hydrateInlineRecord, mapRecordForUpsert } from "./record-mapper.js";
 import type {
 	CompanionRecord,
 	DoctorCheck,
@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { VectorizeClient } from "./vectorize-client.js";
 
-const SMOKE_TEST_TIMEOUT_MS = 12_000;
+const SMOKE_TEST_TIMEOUT_MS = 30_000;
 const SMOKE_TEST_POLL_INTERVAL_MS = 1_000;
 
 export class CloudflareMemoryService {
@@ -84,7 +84,7 @@ export class CloudflareMemoryService {
 
 	async get(params: { id: string; namespace?: string; sessionKey?: string; agentId?: string; workspaceDir?: string }): Promise<HydratedMemoryRecord | null> {
 		const namespace = this.resolveNamespace(params);
-		const vectorId = `${namespace}::${params.id}`;
+		const vectorId = buildVectorId(namespace, params.id);
 		const [match] = await this.vectorize.getByIds([vectorId]);
 		if (!match) {
 			return null;
@@ -121,9 +121,25 @@ export class CloudflareMemoryService {
 			id: mapped.logicalId,
 			namespace,
 		});
+		const fallback =
+			mapped.companionRecord === undefined
+				? this.fromInlineFallback(mapped.vector)
+				: this.fromCompanionFallback(mapped.companionRecord, mapped.logicalId, namespace, mapped.path);
+		const resolved = hydrated
+			? {
+					...fallback,
+					...hydrated,
+					title: hydrated.title ?? fallback.title,
+					text: hydrated.text || fallback.text,
+					metadata: Object.keys(hydrated.metadata).length > 0 ? hydrated.metadata : fallback.metadata,
+					source: hydrated.source ?? fallback.source,
+					createdAt: hydrated.createdAt ?? fallback.createdAt,
+					updatedAt: hydrated.updatedAt ?? fallback.updatedAt,
+				}
+			: fallback;
 
 		return {
-			...(hydrated ?? this.fromCompanionFallback(mapped.companionRecord, mapped.logicalId, namespace, mapped.path)),
+			...resolved,
 			mutationId,
 		};
 	}
@@ -131,7 +147,7 @@ export class CloudflareMemoryService {
 	async delete(params: { id: string; namespace?: string; sessionKey?: string; agentId?: string; workspaceDir?: string }): Promise<string | undefined> {
 		const namespace = this.resolveNamespace(params);
 		await this.companionStore.delete(namespace, params.id);
-		return this.vectorize.deleteByIds([`${namespace}::${params.id}`]);
+		return this.vectorize.deleteByIds([buildVectorId(namespace, params.id)]);
 	}
 
 	async doctor(options: { createIndexIfMissing?: boolean }): Promise<DoctorReport> {
@@ -410,7 +426,7 @@ export class CloudflareMemoryService {
 	private fromCompanionFallback(companionRecord: CompanionRecord | undefined, logicalId: string, namespace: string, path: string): UpsertedMemoryRecord {
 		return {
 			logicalId,
-			vectorId: `${namespace}::${logicalId}`,
+			vectorId: buildVectorId(namespace, logicalId),
 			namespace,
 			title: companionRecord?.title,
 			text: companionRecord?.text ?? "",
@@ -419,6 +435,14 @@ export class CloudflareMemoryService {
 			createdAt: companionRecord?.createdAt,
 			updatedAt: companionRecord?.updatedAt,
 			path,
+		};
+	}
+
+	private fromInlineFallback(vector: { id: string; namespace?: string; metadata?: Record<string, string | number | boolean> }): UpsertedMemoryRecord {
+		const record = hydrateInlineRecord(vector);
+		return {
+			...record,
+			text: record.text ?? "",
 		};
 	}
 

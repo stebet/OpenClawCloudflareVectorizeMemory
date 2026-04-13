@@ -73,6 +73,7 @@ export class VectorizeClient {
 				filter: params.filter,
 				namespace: params.namespace,
 				returnValues: params.returnValues ?? false,
+				returnMetadata: "all",
 			}),
 		});
 		return result.matches ?? [];

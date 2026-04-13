@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { RESERVED_METADATA_KEYS, RESERVED_METADATA_PREFIX } from "./constants.js";
 import { RecordSizeError } from "./errors.js";
 import type {
@@ -32,7 +32,11 @@ function sanitizeMetadata(metadata: Record<string, MetadataValue> | undefined): 
 }
 
 export function buildVectorId(namespace: string, logicalId: string): string {
-	return `${namespace}::${logicalId}`;
+	const rawId = `${namespace}::${logicalId}`;
+	if (Buffer.byteLength(rawId, "utf8") <= 64) {
+		return rawId;
+	}
+	return `cfm_${createHash("sha256").update(rawId).digest("hex").slice(0, 48)}`;
 }
 
 export function buildVirtualPath(namespace: string, logicalId: string): string {
