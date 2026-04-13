@@ -1,0 +1,169 @@
+{
+	"id": "memory-cloudflare-vectorize",
+	"name": "Cloudflare Vectorize Memory",
+	"description": "OpenClaw memory plugin backed by Cloudflare Vectorize and Workers AI embeddings.",
+	"kind": "memory",
+	"uiHints": {
+		"cloudflare.accountId": {
+			"label": "Cloudflare account ID",
+			"help": "Defaults to ${CLOUDFLARE_ACCOUNT_ID}."
+		},
+		"cloudflare.apiToken": {
+			"label": "Cloudflare API token",
+			"sensitive": true,
+			"help": "Defaults to ${CLOUDFLARE_API_TOKEN}."
+		},
+		"vectorize.indexName": {
+			"label": "Vectorize index name",
+			"help": "Defaults to ${CLOUDFLARE_VECTORIZE_INDEX_NAME}."
+		},
+		"vectorize.namespace": {
+			"label": "Fixed namespace override",
+			"help": "Defaults to ${CLOUDFLARE_VECTORIZE_NAMESPACE} or derives from the agent/session."
+		},
+		"vectorize.topK": {
+			"label": "Top-K results",
+			"help": "Defaults to ${CLOUDFLARE_VECTORIZE_TOP_K}."
+		},
+		"embeddings.model": {
+			"label": "Workers AI embedding model",
+			"help": "Defaults to ${CLOUDFLARE_WORKERS_AI_EMBEDDING_MODEL}."
+		},
+		"storage.mode": {
+			"label": "Storage mode",
+			"help": "Defaults to ${OPENCLAW_CF_MEMORY_STORAGE_MODE}."
+		},
+		"storage.companionStorePath": {
+			"label": "Companion store path",
+			"help": "Defaults to ${OPENCLAW_CF_MEMORY_COMPANION_PATH} or .openclaw/memory-cloudflare-vectorize/companion-store.json."
+		}
+	},
+	"configSchema": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+			"cloudflare": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"apiToken": {
+						"anyOf": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "object",
+								"additionalProperties": false,
+								"properties": {
+									"source": {
+										"type": "string",
+										"enum": ["env", "file", "exec"]
+									},
+									"provider": {
+										"type": "string"
+									},
+									"id": {
+										"type": "string"
+									}
+								},
+								"required": ["source", "provider", "id"]
+							}
+						]
+					},
+					"apiBaseUrl": {
+						"type": "string",
+						"format": "uri"
+					},
+					"workersAiBaseUrl": {
+						"type": "string",
+						"format": "uri"
+					},
+					"vectorizeBaseUrl": {
+						"type": "string",
+						"format": "uri"
+					}
+				}
+			},
+			"vectorize": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"indexName": {
+						"type": "string"
+					},
+					"namespace": {
+						"type": "string"
+					},
+					"topK": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 50
+					},
+					"minScore": {
+						"type": "number",
+						"minimum": 0,
+						"maximum": 1
+					},
+					"metric": {
+						"type": "string",
+						"enum": ["cosine", "euclidean", "dot-product"]
+					},
+					"createIndex": {
+						"type": "object",
+						"additionalProperties": false,
+						"properties": {
+							"description": {
+								"type": "string"
+							},
+							"dimensions": {
+								"type": "integer",
+								"minimum": 1,
+								"maximum": 1536
+							},
+							"metric": {
+								"type": "string",
+								"enum": ["cosine", "euclidean", "dot-product"]
+							}
+						}
+					},
+					"metadataIndexedFields": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"embeddings": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"model": {
+						"type": "string"
+					}
+				}
+			},
+			"storage": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["vectorize-inline", "companion-store"]
+					},
+					"companionStorePath": {
+						"type": "string"
+					},
+					"inlineTextMaxBytes": {
+						"type": "integer",
+						"minimum": 256,
+						"maximum": 10000
+					}
+				}
+			}
+		}
+	}
+}

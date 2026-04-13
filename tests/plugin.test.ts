@@ -1,0 +1,44 @@
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+import { describe, expect, it, vi } from "vitest";
+import plugin from "../src/index.js";
+
+describe("plugin registration", () => {
+	it("registers memory capability, embedding provider, tools, and cli", () => {
+		const registerMemoryCapability = vi.fn();
+		const registerMemoryEmbeddingProvider = vi.fn();
+		const registerTool = vi.fn();
+		const registerCli = vi.fn();
+		const logger = {
+			info: vi.fn(),
+			warn: vi.fn(),
+			error: vi.fn(),
+		};
+
+		const api = {
+			pluginConfig: {
+				cloudflare: {
+					accountId: "account",
+					apiToken: "token",
+				},
+				vectorize: {
+					indexName: "memory",
+				},
+			},
+			config: {} as never,
+			logger,
+			registerMemoryCapability,
+			registerMemoryEmbeddingProvider,
+			registerTool,
+			registerCli,
+			resolvePath: (input: string) => input,
+		} as unknown as OpenClawPluginApi;
+
+		expect(plugin.kind).toBe("memory");
+		plugin.register(api);
+
+		expect(registerMemoryEmbeddingProvider).toHaveBeenCalledTimes(1);
+		expect(registerMemoryCapability).toHaveBeenCalledTimes(1);
+		expect(registerTool).toHaveBeenCalledTimes(4);
+		expect(registerCli).toHaveBeenCalledTimes(1);
+	});
+});

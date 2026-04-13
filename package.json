@@ -1,0 +1,64 @@
+{
+	"name": "openclaw-cloudflare-vectorize-memory",
+	"version": "0.1.0",
+	"description": "OpenClaw memory plugin for Cloudflare Vectorize and Workers AI embeddings.",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/types/index.d.ts",
+	"files": [
+		"dist",
+		"openclaw.plugin.json",
+		"README.md",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/types/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"keywords": [
+		"openclaw",
+		"plugin",
+		"cloudflare",
+		"vectorize",
+		"workers-ai",
+		"memory"
+	],
+	"openclaw": {
+		"extensions": [
+			"./dist/index.js"
+		]
+	},
+	"scripts": {
+		"build": "vite build && tsc -p tsconfig.build.json",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"check": "tsc -p tsconfig.json --noEmit",
+		"publish:npmjs": "npm run check && npm test && npm run build && npm publish --access public"
+	},
+	"peerDependencies": {
+		"openclaw": ">=2026.4.11"
+	},
+	"peerDependenciesMeta": {
+		"openclaw": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.11",
+		"@types/node": "25.6.0",
+		"openclaw": "2026.4.11",
+		"typescript": "6.0.2",
+		"vite": "8.0.8",
+		"vitest": "4.1.4"
+	},
+	"dependencies": {
+		"@sinclair/typebox": "0.34.49",
+		"zod": "4.3.6"
+	},
+	"packageManager": "pnpm@11.0.0-rc.0+sha512.1f08eadeea025e91448de6d5dee42a6c94764257000c043a9e36b8ff12849a72ebcb9c65fc1885094747249e52f53d8b73ada1181446bba81866810c8a4d3f6c"
+}
