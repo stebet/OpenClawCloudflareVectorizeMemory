@@ -4,6 +4,12 @@ export const PLUGIN_ID = "memory-cloudflare-vectorize";
 export const PLUGIN_NAME = "Cloudflare Vectorize Memory";
 export const PLUGIN_DESCRIPTION = "OpenClaw memory plugin backed by Cloudflare Vectorize and Workers AI embeddings.";
 export const CLI_ROOT_COMMAND = "cf-memory";
+export const CLI_ROOT_DESCRIPTION = "Manage Cloudflare memory records.";
+export const CLI_ROOT_DESCRIPTOR = {
+	name: CLI_ROOT_COMMAND,
+	description: CLI_ROOT_DESCRIPTION,
+	hasSubcommands: true,
+} as const;
 
 export const CLOUDFLARE_ACCOUNT_ID_ENV = "CLOUDFLARE_ACCOUNT_ID";
 export const CLOUDFLARE_API_TOKEN_ENV = "CLOUDFLARE_API_TOKEN";

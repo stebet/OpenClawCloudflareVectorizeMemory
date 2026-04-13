@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import cliMetadataEntry from "../cli-metadata.ts";
-import { CLI_ROOT_COMMAND } from "../src/constants.js";
+import { CLI_ROOT_COMMAND, CLI_ROOT_DESCRIPTOR } from "../src/constants.js";
 
 class FakeCommand {
 	readonly children: FakeCommand[] = [];
@@ -50,7 +50,7 @@ describe("cli metadata entry", () => {
 		).not.toThrow();
 
 		expect(registerCli).toHaveBeenCalledWith(expect.any(Function), {
-			commands: [CLI_ROOT_COMMAND],
+			descriptors: [CLI_ROOT_DESCRIPTOR],
 		});
 
 		const registrar = registerCli.mock.calls[0]?.[0] as ((ctx: { program: { command: (name: string) => FakeCommand } }) => Promise<void>) | undefined;

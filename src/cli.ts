@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import { CLI_ROOT_COMMAND, CLI_ROOT_DESCRIPTION } from "./constants.js";
 import type { DoctorReport, IndexInitializationReport, MetadataFilter, MigrationDuplicateStrategy, SmokeTestReport } from "./types.js";
 import { formatMigrationSummary, runCloudflareMemoryMigration } from "./migration.js";
 import { createCloudflareMemoryService } from "./service-factory.js";
@@ -82,7 +83,7 @@ export function registerCloudflareMemoryCli(
 		resolvePath?: (input: string) => string;
 	},
 ): void {
-	const root = program.command("cf-memory").description("Manage Cloudflare memory records.");
+	const root = program.command(CLI_ROOT_COMMAND).description(CLI_ROOT_DESCRIPTION);
 
 	function resolveOptions(args: unknown[]): Record<string, unknown> {
 		return resolveInvocation(args).options;

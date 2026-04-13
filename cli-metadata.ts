@@ -1,5 +1,5 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { CLI_ROOT_COMMAND } from "./src/constants.js";
+import { CLI_ROOT_DESCRIPTOR } from "./src/constants.js";
 
 export default definePluginEntry({
 	id: "memory-cloudflare-vectorize",
@@ -17,7 +17,7 @@ export default definePluginEntry({
 				});
 			},
 			{
-				commands: [CLI_ROOT_COMMAND],
+				descriptors: [CLI_ROOT_DESCRIPTOR],
 			},
 		);
 	},
