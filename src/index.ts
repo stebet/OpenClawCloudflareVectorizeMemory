@@ -2,7 +2,7 @@ import type { MemoryEmbeddingProviderAdapter } from "openclaw/plugin-sdk/memory-
 import { definePluginEntry, type OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import { registerCloudflareMemoryCli } from "./cli.js";
 import { getPluginConfigFromOpenClawConfig, pluginConfigSchema, resolvePluginConfig } from "./config.js";
-import { DEFAULT_EMBEDDING_MODEL, PLUGIN_DESCRIPTION, PLUGIN_ID, PLUGIN_NAME } from "./constants.js";
+import { CLI_ROOT_COMMAND, DEFAULT_EMBEDDING_MODEL, PLUGIN_DESCRIPTION, PLUGIN_ID, PLUGIN_NAME } from "./constants.js";
 import { buildPromptSection } from "./prompt.js";
 import { createPublicArtifactsProvider } from "./public-artifacts.js";
 import { createMemoryRuntime } from "./runtime.js";
@@ -60,13 +60,7 @@ function registerCloudflareMemoryCliEntry(api: Pick<OpenClawPluginApi, "register
 			});
 		},
 		{
-			descriptors: [
-				{
-					name: "cf-memory",
-					description: "Manage Cloudflare Vectorize memory",
-					hasSubcommands: true,
-				},
-			],
+			commands: [CLI_ROOT_COMMAND],
 		},
 	);
 }

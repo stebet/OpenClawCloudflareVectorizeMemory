@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { registerCloudflareMemoryCli } from "../src/cli.js";
+import { CLI_ROOT_COMMAND } from "../src/constants.js";
 
 class FakeCommand {
 	readonly children: FakeCommand[] = [];
@@ -51,7 +52,7 @@ describe("registerCloudflareMemoryCli", () => {
 		);
 
 		const root = roots[0];
-		expect(root?.name).toBe("cf-memory");
+		expect(root?.name).toBe(CLI_ROOT_COMMAND);
 		expect(root?.children.map((child) => child.name)).toEqual(["doctor", "init", "test", "search", "upsert", "delete", "migrate"]);
 	});
 });

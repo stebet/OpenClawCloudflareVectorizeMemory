@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import cliMetadataEntry from "../cli-metadata.ts";
+import { CLI_ROOT_COMMAND } from "../src/constants.js";
 
 class FakeCommand {
 	readonly children: FakeCommand[] = [];
@@ -49,13 +50,7 @@ describe("cli metadata entry", () => {
 		).not.toThrow();
 
 		expect(registerCli).toHaveBeenCalledWith(expect.any(Function), {
-			descriptors: [
-				{
-					name: "cf-memory",
-					description: "Manage Cloudflare Vectorize memory",
-					hasSubcommands: true,
-				},
-			],
+			commands: [CLI_ROOT_COMMAND],
 		});
 
 		const registrar = registerCli.mock.calls[0]?.[0] as ((ctx: { program: { command: (name: string) => FakeCommand } }) => Promise<void>) | undefined;
@@ -73,7 +68,7 @@ describe("cli metadata entry", () => {
 		});
 
 		const root = roots[0];
-		expect(root?.name).toBe("cf-memory");
+		expect(root?.name).toBe(CLI_ROOT_COMMAND);
 		expect(root?.children.map((child) => child.name)).toEqual(["doctor", "init", "test", "search", "upsert", "delete", "migrate"]);
 	});
 });
