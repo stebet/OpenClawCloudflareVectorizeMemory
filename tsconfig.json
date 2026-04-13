@@ -19,5 +19,5 @@
 		"noFallthroughCasesInSwitch": true,
 		"strict": true
 	},
-	"include": ["src", "tests", "vite.config.ts"]
+	"include": ["src", "tests", "cli-metadata.ts", "vite.config.ts"]
 }

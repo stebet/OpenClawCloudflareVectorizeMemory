@@ -1,11 +1,12 @@
 {
 	"name": "openclaw-cloudflare-vectorize-memory",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "OpenClaw memory plugin for Cloudflare Vectorize and Workers AI embeddings.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/types/index.d.ts",
 	"files": [
+		"cli-metadata.ts",
 		"dist",
 		"hooks",
 		"openclaw.plugin.json",

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import plugin from "../src/index.js";
 
 describe("plugin registration", () => {
-	it("registers memory capability, embedding provider, tools, and cli", () => {
+	it("registers memory capability, embedding provider, tools, and cli in full mode", () => {
 		const registerMemoryCapability = vi.fn();
 		const registerMemoryEmbeddingProvider = vi.fn();
 		const registerTool = vi.fn();
@@ -15,6 +15,7 @@ describe("plugin registration", () => {
 		};
 
 		const api = {
+			registrationMode: "full",
 			pluginConfig: {
 				cloudflare: {
 					accountId: "account",
@@ -39,6 +40,27 @@ describe("plugin registration", () => {
 		expect(registerMemoryEmbeddingProvider).toHaveBeenCalledTimes(1);
 		expect(registerMemoryCapability).toHaveBeenCalledTimes(1);
 		expect(registerTool).toHaveBeenCalledTimes(4);
+		expect(registerCli).toHaveBeenCalledTimes(1);
+	});
+
+	it("registers only cli metadata when loaded without memory handlers", () => {
+		const registerCli = vi.fn();
+		const logger = {
+			info: vi.fn(),
+			warn: vi.fn(),
+			error: vi.fn(),
+		};
+
+		const api = {
+			registrationMode: "cli-metadata",
+			pluginConfig: {},
+			config: {} as never,
+			logger,
+			registerCli,
+			resolvePath: (input: string) => input,
+		} as unknown as OpenClawPluginApi;
+
+		expect(() => plugin.register(api)).not.toThrow();
 		expect(registerCli).toHaveBeenCalledTimes(1);
 	});
 });

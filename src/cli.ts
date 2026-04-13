@@ -200,11 +200,7 @@ export function registerCloudflareMemoryCli(
 			const { positionals, options } = resolveInvocation(args);
 			const rawSources = positionals[0];
 			const sourcePaths =
-				positionals.length === 0
-					? []
-					: Array.isArray(rawSources)
-						? rawSources.map((value) => String(value))
-						: positionals.map((value) => String(value));
+				positionals.length === 0 ? [] : Array.isArray(rawSources) ? rawSources.map((value) => String(value)) : positionals.map((value) => String(value));
 			const service = await createCloudflareMemoryService({
 				pluginConfig: params.pluginConfig,
 				openClawConfig: params.openClawConfig,

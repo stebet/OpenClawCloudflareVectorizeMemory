@@ -336,10 +336,7 @@ function formatDoctorFailure(report: DoctorReport): string {
 	return failedChecks.map((check) => `${check.name}: ${check.message}`).join(" | ");
 }
 
-export async function runCloudflareMemoryMigration(params: {
-	service: CloudflareMemoryService;
-	options?: MigrationRunOptions;
-}): Promise<MigrationSummary> {
+export async function runCloudflareMemoryMigration(params: { service: CloudflareMemoryService; options?: MigrationRunOptions }): Promise<MigrationSummary> {
 	const options = params.options ?? {};
 	const workspaceDir = resolve(options.workspaceDir ?? process.cwd());
 	const sourceMode: MigrationSourceMode = (options.sourcePaths?.length ?? 0) > 0 ? "paths" : "default-provider";

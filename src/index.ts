@@ -50,6 +50,27 @@ function createMemoryEmbeddingProviderAdapter(): MemoryEmbeddingProviderAdapter 
 	};
 }
 
+function registerCloudflareMemoryCliEntry(api: Pick<OpenClawPluginApi, "registerCli" | "pluginConfig" | "config" | "resolvePath">): void {
+	api.registerCli(
+		({ program }) => {
+			registerCloudflareMemoryCli(program, {
+				pluginConfig: api.pluginConfig,
+				openClawConfig: api.config,
+				resolvePath: api.resolvePath,
+			});
+		},
+		{
+			descriptors: [
+				{
+					name: "cf-memory",
+					description: "Manage Cloudflare Vectorize memory",
+					hasSubcommands: true,
+				},
+			],
+		},
+	);
+}
+
 export default definePluginEntry({
 	id: PLUGIN_ID,
 	name: PLUGIN_NAME,
@@ -58,6 +79,17 @@ export default definePluginEntry({
 	configSchema: pluginConfigSchema,
 	register(api: OpenClawPluginApi) {
 		pluginConfigSchema.parse?.(api.pluginConfig ?? {});
+
+		registerCloudflareMemoryCliEntry(api);
+
+		if (
+			api.registrationMode === "cli-metadata" ||
+			typeof api.registerMemoryEmbeddingProvider !== "function" ||
+			typeof api.registerMemoryCapability !== "function" ||
+			typeof api.registerTool !== "function"
+		) {
+			return;
+		}
 
 		api.registerMemoryEmbeddingProvider(createMemoryEmbeddingProviderAdapter());
 		api.registerMemoryCapability({
@@ -81,25 +113,6 @@ export default definePluginEntry({
 		api.registerTool((ctx) => createDeleteTool(api.pluginConfig, ctx), {
 			names: ["cloudflare_memory_delete"],
 		});
-
-		api.registerCli(
-			({ program }) => {
-				registerCloudflareMemoryCli(program, {
-					pluginConfig: api.pluginConfig,
-					openClawConfig: api.config,
-					resolvePath: api.resolvePath,
-				});
-			},
-			{
-				descriptors: [
-					{
-						name: "cf-memory",
-						description: "Manage Cloudflare Vectorize memory",
-						hasSubcommands: true,
-					},
-				],
-			},
-		);
 
 		void resolvePluginConfig({
 			pluginConfig: api.pluginConfig,

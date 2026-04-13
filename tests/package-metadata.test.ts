@@ -15,6 +15,7 @@ describe("package metadata", () => {
 			openclaw?: { hooks?: string[] };
 		};
 
+		expect(manifest.files).toContain("cli-metadata.ts");
 		expect(manifest.files).toContain("hooks");
 		expect(manifest.openclaw?.hooks).toContain("hooks/cloudflare-memory-bootstrap");
 	});

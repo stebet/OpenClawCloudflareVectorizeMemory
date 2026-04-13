@@ -1,7 +1,7 @@
 allowBuilds:
-  '@discordjs/opus': set this to true or false
-  '@matrix-org/matrix-sdk-crypto-nodejs': set this to true or false
-  koffi: set this to true or false
-  openclaw: set this to true or false
-  protobufjs: set this to true or false
-  sharp: set this to true or false
+  '@discordjs/opus': true
+  '@matrix-org/matrix-sdk-crypto-nodejs': true
+  koffi: true
+  openclaw: true
+  protobufjs: true
+  sharp: true
