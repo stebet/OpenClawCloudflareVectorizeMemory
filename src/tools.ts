@@ -4,15 +4,21 @@ import type { CloudflareMemoryService } from "./service.js";
 import { createCloudflareMemoryService } from "./service-factory.js";
 import type { MetadataFilter, MetadataValue } from "./types.js";
 
-async function buildService(pluginConfig: unknown, ctx: OpenClawPluginToolContext): Promise<CloudflareMemoryService> {
+type ToolRegistrationContext = {
+	pluginConfig: unknown;
+	resolvePath?: (input: string) => string;
+};
+
+async function buildService(registration: ToolRegistrationContext, ctx: OpenClawPluginToolContext): Promise<CloudflareMemoryService> {
 	const runtimeConfig = ctx.runtimeConfig ?? ctx.config;
 	if (!runtimeConfig) {
 		throw new Error("Cloudflare memory tools require an OpenClaw runtime config.");
 	}
 	return createCloudflareMemoryService({
-		pluginConfig,
+		pluginConfig: registration.pluginConfig,
 		openClawConfig: runtimeConfig,
 		env: process.env,
+		resolvePath: registration.resolvePath,
 	});
 }
 
@@ -36,7 +42,7 @@ function textResult<TDetails>(text: string, details: TDetails) {
 	};
 }
 
-export function createSearchTool(pluginConfig: unknown, ctx: OpenClawPluginToolContext): AnyAgentTool {
+export function createSearchTool(registration: ToolRegistrationContext, ctx: OpenClawPluginToolContext): AnyAgentTool {
 	return {
 		name: "cloudflare_memory_search",
 		label: "Cloudflare Memory Search",
@@ -49,7 +55,7 @@ export function createSearchTool(pluginConfig: unknown, ctx: OpenClawPluginToolC
 			filterJson: Type.Optional(Type.String({ description: "Optional JSON object for Vectorize metadata filtering." })),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate) {
-			const service = await buildService(pluginConfig, ctx);
+			const service = await buildService(registration, ctx);
 			const filter = parseJsonObject<MetadataFilter>(params.filterJson as string | undefined, "filterJson");
 			const records = await service.search({
 				query: params.query as string,
@@ -81,7 +87,7 @@ export function createSearchTool(pluginConfig: unknown, ctx: OpenClawPluginToolC
 	};
 }
 
-export function createGetTool(pluginConfig: unknown, ctx: OpenClawPluginToolContext): AnyAgentTool {
+export function createGetTool(registration: ToolRegistrationContext, ctx: OpenClawPluginToolContext): AnyAgentTool {
 	return {
 		name: "cloudflare_memory_get",
 		label: "Cloudflare Memory Get",
@@ -91,7 +97,7 @@ export function createGetTool(pluginConfig: unknown, ctx: OpenClawPluginToolCont
 			namespace: Type.Optional(Type.String({ description: "Optional namespace override." })),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate) {
-			const service = await buildService(pluginConfig, ctx);
+			const service = await buildService(registration, ctx);
 			const record = await service.get({
 				id: params.id as string,
 				namespace: params.namespace as string | undefined,
@@ -112,7 +118,7 @@ export function createGetTool(pluginConfig: unknown, ctx: OpenClawPluginToolCont
 	};
 }
 
-export function createUpsertTool(pluginConfig: unknown, ctx: OpenClawPluginToolContext): AnyAgentTool {
+export function createUpsertTool(registration: ToolRegistrationContext, ctx: OpenClawPluginToolContext): AnyAgentTool {
 	return {
 		name: "cloudflare_memory_upsert",
 		label: "Cloudflare Memory Upsert",
@@ -130,7 +136,7 @@ export function createUpsertTool(pluginConfig: unknown, ctx: OpenClawPluginToolC
 			),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate) {
-			const service = await buildService(pluginConfig, ctx);
+			const service = await buildService(registration, ctx);
 			const record = await service.upsert({
 				input: {
 					id: params.id as string | undefined,
@@ -154,7 +160,7 @@ export function createUpsertTool(pluginConfig: unknown, ctx: OpenClawPluginToolC
 	};
 }
 
-export function createDeleteTool(pluginConfig: unknown, ctx: OpenClawPluginToolContext): AnyAgentTool {
+export function createDeleteTool(registration: ToolRegistrationContext, ctx: OpenClawPluginToolContext): AnyAgentTool {
 	return {
 		name: "cloudflare_memory_delete",
 		label: "Cloudflare Memory Delete",
@@ -164,7 +170,7 @@ export function createDeleteTool(pluginConfig: unknown, ctx: OpenClawPluginToolC
 			namespace: Type.Optional(Type.String({ description: "Optional namespace override." })),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate) {
-			const service = await buildService(pluginConfig, ctx);
+			const service = await buildService(registration, ctx);
 			const mutationId = await service.delete({
 				id: params.id as string,
 				namespace: params.namespace as string | undefined,

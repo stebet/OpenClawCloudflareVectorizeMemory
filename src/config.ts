@@ -228,6 +228,30 @@ type PluginEntriesAwareConfig = OpenClawConfig & {
 	};
 };
 
+const PLUGIN_CONFIG_ROOT_KEYS = ["cloudflare", "vectorize", "embeddings", "storage"] as const satisfies ReadonlyArray<keyof RawPluginConfig>;
+
+function unwrapPluginConfigCandidate(value: unknown): unknown {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return value;
+	}
+
+	const candidate = value as Record<string, unknown>;
+	if ("config" in candidate) {
+		return unwrapPluginConfigCandidate(candidate.config);
+	}
+
+	const directConfig = Object.fromEntries(PLUGIN_CONFIG_ROOT_KEYS.filter((key) => key in candidate).map((key) => [key, candidate[key]]));
+	if (Object.keys(directConfig).length > 0) {
+		return directConfig;
+	}
+
+	if ("enabled" in candidate && Object.keys(candidate).every((key) => key === "enabled")) {
+		return {};
+	}
+
+	return value;
+}
+
 function pickFirstDefined<T>(...values: Array<T | undefined>): T | undefined {
 	return values.find((value) => value !== undefined);
 }
@@ -261,9 +285,13 @@ export function parsePluginConfig(value: unknown): RawPluginConfig {
 	return pluginConfigZod.parse(value ?? {});
 }
 
+export function normalizePluginConfigInput(value: unknown): RawPluginConfig {
+	return parsePluginConfig(unwrapPluginConfigCandidate(value) ?? {});
+}
+
 export function getPluginConfigFromOpenClawConfig(config: OpenClawConfig): RawPluginConfig {
 	const candidate = (config as PluginEntriesAwareConfig).plugins?.entries?.[PLUGIN_ID];
-	return parsePluginConfig(candidate ?? {});
+	return normalizePluginConfigInput(candidate ?? {});
 }
 
 export async function resolvePluginConfig(params: {
@@ -272,7 +300,7 @@ export async function resolvePluginConfig(params: {
 	env?: NodeJS.ProcessEnv;
 	resolvePath?: (input: string) => string;
 }): Promise<ResolvedPluginConfig> {
-	const parsed = parsePluginConfig(params.pluginConfig);
+	const parsed = normalizePluginConfigInput(params.pluginConfig);
 	const env = params.env ?? process.env;
 	const configPathBase = `plugins.entries.${PLUGIN_ID}`;
 	const accountId = pickTrimmed(parsed.cloudflare?.accountId, env[CLOUDFLARE_ACCOUNT_ID_ENV]);
